@@ -96,3 +96,25 @@ which is real-user data pulled by URL and independent of that bad load.
 PSI runs Lighthouse on Google's infrastructure, so this is a clean run without
 local-machine noise. Mobile is the primary target (mobile-first indexing), and
 since Lighthouse can't measure INP, TBT is the lab proxy for it.
+
+## Network Activity
+
+Captured 5 July 2026 from the DevTools Network panel (desktop, no throttling):
+fresh load, then a soft refresh. Transfer size first, uncompressed resource size
+in parentheses. Screenshots in `evidence/03-networking/`.
+
+- **protocol**: http/2 and http/3
+- **caching**
+  - first-party static assets: content-hashed, long TTL (served from cache on refresh)
+  - the page and ad/tracker calls: re-fetched each load
+- **compression**
+  - text (HTML/JS/CSS): brotli/gzip (one script even uses zstd)
+  - images: none — already served as WebP by the image CDN
+
+### Desktop
+
+- **requests**: 208
+- **fresh**: 5.3 MB (11.8 MB)
+  - **js/css**: 1.7 MB (8.0 MB)
+  - **images**: 2.4 MB (2.4 MB)
+- **refresh**: 1.3 MB (11.7 MB)

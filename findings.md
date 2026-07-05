@@ -77,12 +77,13 @@ estimates 1,157 KiB of savings.
 **Cause (measured):** the top "day-only" banner is a 624.8 KiB animated GIF
 (~425 KiB saveable by using a video format). The ranking-widget player photos are
 served at 400×417 but displayed at 70×73 — roughly 100 KiB wasted per player
-across several of them. The images are PNG/GIF rather than WebP/AVIF and aren't
-sized for their display box.
+across several of them. The photos come back from the image CDN as WebP, so the
+format is fine — they just aren't sized for their display box, and the banner is
+a raw animated GIF.
 
 **Solution:** replace the GIF with a video or a static image, serve the player
-photos at display size with responsive `srcset`/`sizes`, and switch to WebP/AVIF.
-The images are already lazy-loaded, so this is about size and format, not timing.
+photos at display size with responsive `srcset`/`sizes`. The images are already
+lazy-loaded and already WebP, so this is about dimensions, not format or timing.
 
 ## 5. A stack of third-party tag, consent and ad scripts
 
@@ -103,3 +104,58 @@ ad/tracking pixels.
 script without blocking render, and drop or defer the ad/tracking pixels that
 aren't needed at load. Fewer tag managers means fewer bytes and less main-thread
 time.
+
+---
+
+## Networking
+
+Numbers from the DevTools Network panel (desktop, fresh load then soft refresh —
+see [baseline](baseline.md) → Network Activity). HLTV is light for a media site
+(208 requests, 5.3 MB), and two things are already done well: text compresses
+~78 % (js/css 8.0 MB → 1.7 MB via brotli/gzip/zstd), and caching cuts a soft
+refresh to 1.3 MB (~75 % less). Images are already WebP. So the problems here are
+a couple of oversized payloads, not request sprawl.
+
+## 6. One stylesheet is enormous
+
+**Users:** the browser downloads and parses ~2.3 MB of CSS (uncompressed) before
+the first render can complete — dead time in front of a blank screen on a slow
+connection.
+
+**Metrics:** First Contentful Paint (this CSS is render-blocking); part of the
+5.3 MB transfer.
+
+**Cause:** one global stylesheet (`EverythingDay.css`) ships ~2.3 MB uncompressed
+(~311 KB over the wire as brotli) instead of page-specific CSS — the same file
+flagged as render-blocking in finding 1.
+
+**Solution:** split the CSS and load only what the homepage needs up front; defer
+the rest.
+
+## 7. The JavaScript payload is heavy
+
+**Users:** 5.6 MB of uncompressed JavaScript across 43 files to download, parse
+and run — the main reason the page freezes (finding 2).
+
+**Metrics:** Total Blocking Time; JS transfer 1.4 MB (5.6 MB uncompressed).
+
+**Cause:** a large first-party bundle plus the ad and tracking scripts. PSI
+already flagged 458 KiB of unused JS and 43 KiB of legacy polyfills inside it.
+
+**Solution:** code-split and defer the non-critical JS, drop the legacy
+transpilation, and cut the third-party scripts that don't need to run at load.
+
+## 8. Images are the biggest download, and some are oversized
+
+**Users:** images are 2.4 MB of the 5.3 MB — the largest single content type —
+and a few are far bigger than the box they're shown in, so mobile users pay for
+pixels they never see.
+
+**Metrics:** Speed Index and LCP; image transfer 2.4 MB.
+
+**Cause:** the format is already right — the CDN returns WebP — so the waste is
+dimensions: the ranking photos come back at 400×417 for a 70×73 display, and the
+top banner is still a 624 KB animated GIF (finding 4).
+
+**Solution:** request the photos at display size with responsive `srcset`/`sizes`,
+and replace the GIF banner with a video.
