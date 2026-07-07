@@ -11,6 +11,51 @@ Context: at the 75th percentile HLTV already passes Core Web Vitals (see the
 cold-cache experience the lab profile exposes — the long tail, not the median
 visit.
 
+## Prioritization (WSJF)
+
+Corrective findings are ranked with **WSJF** — Weighted Shortest Job First: Cost
+of Delay ÷ Job Size — so the cheapest high-value fixes float up. It's a different
+lens from a plain impact-vs-effort split: Cost of Delay is built from three
+sub-scores, which is what lets unrelated fixes be compared on one number. It's
+subjective by design; the value is a written-down, repeatable basis.
+
+Cost of Delay = User value + Time criticality + Risk/opportunity (each 1–10):
+
+- **User value (1–10)** — how much the fix improves the real experience, weighted
+  to mobile (the primary profile).
+- **Time criticality (1–10)** — how urgent it is. HLTV already passes field Core
+  Web Vitals, so this sits low across the board — higher only where mobile ranking
+  pressure applies or the problem worsens as the site grows. It's what keeps the
+  ranking honest: these are improvements, not fires.
+- **Risk / opportunity (1–10)** — does it cut risk (third-party/privacy, or
+  protect the passing field score from regressing) or unblock later work (e.g.,
+  splitting the CSS enables more)?
+
+**Job Size (1–10)** — rough relative effort: 1 = an attribute; 10 = a code-split
+or CSS rewrite.
+
+WSJF = Cost of Delay ÷ Job Size. Higher = do sooner. Good findings aren't scored —
+they're observations, not work.
+
+| # | Finding | UV | TC | R/O | CoD | Job | WSJF | Tier |
+|---|---------|:--:|:--:|:---:|:---:|:---:|:----:|:----:|
+| 1 | Hero image loads late (LCP) | 8 | 6 | 4 | 18 | 1 | **18.0** | High |
+| 2 | Top banner is a 624 KiB GIF | 5 | 3 | 2 | 10 | 2 | **5.0** | High |
+| 3 | Mobile gets desktop-sized images | 6 | 4 | 3 | 13 | 3 | **4.3** | Med |
+| 4 | Ranking photos oversized for their box | 5 | 3 | 3 | 11 | 3 | **3.7** | Med |
+| 5 | Third-party tag/consent/ad stack | 6 | 4 | 8 | 18 | 5 | **3.6** | Med |
+| 6 | Blank screen before render (FCP) | 7 | 5 | 6 | 18 | 6 | **3.0** | Med |
+| 7 | Far slower on mobile than desktop | 9 | 6 | 5 | 20 | 8 | **2.5** | Low |
+| 8 | Freezes while loading (TBT) | 6 | 4 | 5 | 15 | 7 | **2.1** | Low |
+
+The one-line hero `fetchpriority` fix tops the list at 18, and contained asset
+swaps (the GIF, responsive images) beat the big rewrites. The mobile umbrella
+(row 7) scores *low* despite mobile being the primary profile — not because it
+doesn't matter but because its job size is the whole rendering program; read it as
+"high value, big project." And because HLTV already passes for real users, nothing
+here is urgent — WSJF is sorting nice-to-haves, which is the right posture for a
+site that's healthy in the field.
+
 ## Rendering
 
 - The page is blank for about three seconds before anything renders.
@@ -22,6 +67,7 @@ visit.
   - **Solution**:
     - Inline the critical CSS and load the rest non-blocking; split `EverythingDay.css` so a page only loads what it needs.
     - Defer/`async` the scripts, load the consent script without blocking render, and add `preconnect` to the key origins.
+  - **Priority (WSJF)**: CoD 18 (UV 7 + TC 5 + R/O 6) ÷ Job 6 = **3.0** (Med).
 
 - The main article image appears late.
   - **Baseline**: LCP (10.7 s mobile lab / 1.8 s field — field passes).
@@ -30,6 +76,7 @@ visit.
     - It also sits behind the render-blocking chain above. The field LCP breakdown shows load-delay (745 ms) as the biggest component.
   - **Solution**:
     - Add `fetchpriority="high"` and a preload to the hero image, and preconnect to `img-cdn.hltv.org`.
+  - **Priority (WSJF)**: CoD 18 (UV 8 + TC 6 + R/O 4) ÷ Job 1 = **18.0** (High — the top quick win: one attribute plus a preload at the failing lab LCP).
 
 - The page freezes when you scroll or tap while it's still loading.
   - **Baseline**: TBT (970 ms mobile lab); main-thread work 2.8 s.
@@ -39,6 +86,7 @@ visit.
   - **Solution**:
     - Code-split and defer non-critical JS, ship modern ES (drop the legacy transpilation), and remove the unused code.
     - Stop reading layout (`offsetWidth` and similar) right after writing to the DOM.
+  - **Priority (WSJF)**: CoD 15 (UV 6 + TC 4 + R/O 5) ÷ Job 7 = **2.1** (Low — worthwhile, but the code-split is the biggest job here).
 
 - A stack of third-party tag, consent and ad scripts loads on every visit.
   - **Baseline**: TBT and Speed Index (plus bytes and privacy).
@@ -46,6 +94,7 @@ visit.
     - Google Tag Manager 490 KiB (186 ms), Cookiebot 316 KiB (284 ms), Facebook 164 KiB (135 ms) and cadmus 163 KiB (265 ms), plus Outbrain, Yahoo, Doubleclick and Google Analytics.
   - **Solution**:
     - Load tag-manager and analytics after first paint, load the consent script without blocking render, and drop or defer the ad/tracking calls that aren't needed at load.
+  - **Priority (WSJF)**: CoD 18 (UV 6 + TC 4 + R/O 8) ÷ Job 5 = **3.6** (Med — the R/O score is high: this is the main third-party/privacy risk cut).
 
 ## Networking
 
@@ -57,6 +106,7 @@ visit.
     - The image CDN returns WebP (good), but the ranking player photos come back at 400×417 for a 70×73 display — roughly 100 KiB wasted per photo across several.
   - **Solution**:
     - Request the photos at display size with responsive `srcset`/`sizes`.
+  - **Priority (WSJF)**: CoD 11 (UV 5 + TC 3 + R/O 3) ÷ Job 3 = **3.7** (Med).
 
 - The top banner is a 624 KiB animated GIF.
   - **Baseline**: image bytes; Speed Index. PSI estimates ~425 KiB saveable.
@@ -64,6 +114,7 @@ visit.
     - A single animated GIF is used for the top "day-only" banner instead of a video.
   - **Solution**:
     - Replace the GIF with a video (or a static image with the animation on interaction).
+  - **Priority (WSJF)**: CoD 10 (UV 5 + TC 3 + R/O 2) ÷ Job 2 = **5.0** (High — one heavy asset, contained swap).
 
 ### Good
 
@@ -94,6 +145,7 @@ ranking is scored on.
     - Mobile and desktop download almost the same bytes (5.2 MB vs 5.3 MB), so the gap isn't payload — it's the render-blocking chain (est. 10,180 ms; `hltv.js` 563 KiB / ~7,530 ms, `EverythingDay.css` 2.3 MB) and the JS main-thread work meeting a 4× slower CPU and a slow radio.
   - **Solution**:
     - The rendering fixes elsewhere in this report (inline critical CSS, split and defer the CSS/JS, `fetchpriority` on the hero) barely move the desktop score but are what rescue mobile — budget and test against Slow 4G + 4× CPU, not a desktop link.
+  - **Priority (WSJF)**: CoD 20 (UV 9 + TC 6 + R/O 5) ÷ Job 8 = **2.5** (Low — an umbrella finding; its job size is the whole rendering program, so WSJF ranks the ROI low even though the value is the highest of the set).
 
 - Mobile downloads desktop-sized images.
   - **Baseline**: images are 2.2 MB of the 5.2 MB mobile load; Speed Index / LCP.
@@ -101,6 +153,7 @@ ranking is scored on.
     - There's no responsive `srcset`, so a phone fetches the same full-size assets desktop does — the ranking photos at 400×417 (shown ~70×73) and the 624 KiB animated GIF banner — and on Slow 4G those image bytes dominate the load. (The oversized-image root is the networking finding above; the mobile-specific point is that nothing is downscaled for the small screen or the slow link.)
   - **Solution**:
     - Serve responsive `srcset`/`sizes` at display size and replace the GIF with a video or static image — the saving is largest on mobile.
+  - **Priority (WSJF)**: CoD 13 (UV 6 + TC 4 + R/O 3) ÷ Job 3 = **4.3** (Med).
 
 ### Good
 
