@@ -27,8 +27,11 @@ the site is fine for the median user; the lab numbers below are the low-end tail
 
 ## PageSpeed Insights at `/`
 
-Lab data (Lighthouse). Mobile is an emulated Moto G Power on Slow 4G; desktop is
-the emulated desktop profile.
+Lab data (Lighthouse). Mobile is throttled to the class setting — **Slow 4G with
+a 4× CPU slowdown, applied (not simulated)** — on an emulated mid-range phone
+(Moto G Power); desktop uses the emulated desktop profile with no throttling.
+Mobile is the primary signal (mobile-first indexing), so the mobile column is the
+one the findings track.
 
 ### Desktop
 
@@ -57,7 +60,9 @@ does not.
 ## Network Activity
 
 DevTools Network panel — fresh load, then a soft refresh. Transfer size first,
-uncompressed resource size in parentheses.
+uncompressed resource size in parentheses. These are byte and request counts, so
+they don't change with throttling; the mobile *timing* under the class throttle is
+the PSI mobile column above.
 
 - **protocol**: http/2 and http/3
 - **caching**
@@ -117,9 +122,12 @@ Screenshots for these are in `evidence/02-baseline-findings/`:
 ## Note on method
 
 Scores are from PageSpeed Insights (Lighthouse on Google's infrastructure — a
-clean run without local-machine noise). Mobile is weighted as primary; since
-Lighthouse can't measure INP, TBT is the lab proxy. I also tried a local
-Lighthouse trace, but Cloudflare served the automated browser a bot challenge
-instead of the real page, so that trace was discarded — the field LCP breakdown
-is real-user CrUX data pulled by URL. Networking numbers are from the DevTools
-Network panel.
+clean run without local-machine noise), and PSI applies the same Slow 4G + 4× CPU
+mobile throttle the class specifies, so the mobile column is the throttled-mobile
+measurement. Mobile is weighted as primary (mobile-first indexing); since
+Lighthouse can't measure INP, TBT is the lab proxy. The class's "applied, not
+simulated" local Lighthouse run (Step 2) isn't possible on this site: Cloudflare
+serves the automated Lighthouse run a bot challenge instead of the page — the same
+reason an earlier local trace was discarded — while PSI gets through because it
+runs from Google's own infrastructure. The field LCP breakdown is real-user CrUX
+data pulled by URL. Networking numbers are from the DevTools Network panel.

@@ -2,8 +2,9 @@
 
 Grouped by area, corrective first within each. Each finding is a distinct,
 independently observable problem — where several causes feed one symptom, they
-sit under that finding. Numbers come from the PSI mobile Insights/Diagnostics and
-the DevTools Network panel (see [baseline](baseline.md)).
+sit under that finding. Numbers come from the PSI mobile Insights/Diagnostics, the
+DevTools Network panel, and the throttled-mobile PSI column (Slow 4G + 4× CPU) —
+see [baseline](baseline.md).
 
 Context: at the 75th percentile HLTV already passes Core Web Vitals (see the
 "Good" findings). The corrective findings are the low-end, slow-network,
@@ -77,6 +78,35 @@ visit.
 - Images already use a modern format.
   - **Baseline**: image format.
   - The CDN serves WebP, so the remaining image issue is dimensions, not format.
+
+## Mobile
+
+Mobile is Google's primary ranking signal, and Slow 4G + 4× CPU is the condition
+the audit weights first. HLTV's field data passes on mobile, so these are about
+the throttled low-end — but that's the tail the lab exposes and the profile mobile
+ranking is scored on.
+
+### Corrective
+
+- The same page is far slower on mobile than on desktop.
+  - **Baseline**: throttled-mobile lab (Slow 4G + 4× CPU) vs desktop lab — Performance 39 vs 69, LCP 10.7 s vs 1.8 s (~6×), FCP 3.2 s vs 0.8 s, Speed Index 10.2 s vs 2.4 s, TBT 970 ms vs 410 ms.
+  - **Cause**:
+    - Mobile and desktop download almost the same bytes (5.2 MB vs 5.3 MB), so the gap isn't payload — it's the render-blocking chain (est. 10,180 ms; `hltv.js` 563 KiB / ~7,530 ms, `EverythingDay.css` 2.3 MB) and the JS main-thread work meeting a 4× slower CPU and a slow radio.
+  - **Solution**:
+    - The rendering fixes elsewhere in this report (inline critical CSS, split and defer the CSS/JS, `fetchpriority` on the hero) barely move the desktop score but are what rescue mobile — budget and test against Slow 4G + 4× CPU, not a desktop link.
+
+- Mobile downloads desktop-sized images.
+  - **Baseline**: images are 2.2 MB of the 5.2 MB mobile load; Speed Index / LCP.
+  - **Cause**:
+    - There's no responsive `srcset`, so a phone fetches the same full-size assets desktop does — the ranking photos at 400×417 (shown ~70×73) and the 624 KiB animated GIF banner — and on Slow 4G those image bytes dominate the load. (The oversized-image root is the networking finding above; the mobile-specific point is that nothing is downscaled for the small screen or the slow link.)
+  - **Solution**:
+    - Serve responsive `srcset`/`sizes` at display size and replace the GIF with a video or static image — the saving is largest on mobile.
+
+### Good
+
+- The layout is rock-stable on mobile.
+  - **Baseline**: CLS 0 (field) / 0 (PSI lab) — well under the 0.1 threshold.
+  - Despite the ad slots, ranking widgets and the banner, nothing shifts as the page loads on a phone. Layout stability is the one thing HLTV nails on mobile; the problem is load speed, not jumpiness.
 
 ## Overall
 
