@@ -3,8 +3,8 @@
 Grouped by area, corrective first within each. Each finding is a distinct,
 independently observable problem — where several causes feed one symptom, they
 sit under that finding. Numbers come from the PSI mobile Insights/Diagnostics, the
-DevTools Network panel, and the throttled-mobile PSI column (Slow 4G + 4× CPU) —
-see [baseline](baseline.md).
+DevTools Network panel, the throttled-mobile PSI column (Slow 4G + 4× CPU), and a
+by-hand DevTools inspection of the build outputs — see [baseline](baseline.md).
 
 Context: at the 75th percentile HLTV already passes Core Web Vitals (see the
 "Good" findings). The corrective findings are the low-end, slow-network,
@@ -44,9 +44,12 @@ they're observations, not work.
 | 3 | Mobile gets desktop-sized images | 6 | 4 | 3 | 13 | 3 | **4.3** | Med |
 | 4 | Ranking photos oversized for their box | 5 | 3 | 3 | 11 | 3 | **3.7** | Med |
 | 5 | Third-party tag/consent/ad stack | 6 | 4 | 8 | 18 | 5 | **3.6** | Med |
-| 6 | Blank screen before render (FCP) | 7 | 5 | 6 | 18 | 6 | **3.0** | Med |
-| 7 | Far slower on mobile than desktop | 9 | 6 | 5 | 20 | 8 | **2.5** | Low |
-| 8 | Freezes while loading (TBT) | 6 | 4 | 5 | 15 | 7 | **2.1** | Low |
+| 6 | Theme CSS ~2.3 MB, ~99% unused | 7 | 5 | 6 | 18 | 5 | **3.6** | Med |
+| 7 | Font Awesome library ~99% unused | 3 | 2 | 2 | 7 | 2 | **3.5** | Med |
+| 8 | Blank screen before render (FCP) | 7 | 5 | 6 | 18 | 6 | **3.0** | Med |
+| 9 | `hltv.js` ~3 MB, 42% unused, not split | 7 | 5 | 6 | 18 | 7 | **2.6** | Low |
+| 10 | Far slower on mobile than desktop | 9 | 6 | 5 | 20 | 8 | **2.5** | Low |
+| 11 | Freezes while loading (TBT) | 6 | 4 | 5 | 15 | 7 | **2.1** | Low |
 
 The one-line hero `fetchpriority` fix tops the list at 18, and contained asset
 swaps (the GIF, responsive images) beat the big rewrites. The mobile umbrella
@@ -129,6 +132,36 @@ site that's healthy in the field.
 - Images already use a modern format.
   - **Baseline**: image format.
   - The CDN serves WebP, so the remaining image issue is dimensions, not format.
+
+## Build output
+
+Findings from the shipped build outputs (Day 7) — how the JS and CSS assets are
+bundled. See the [baseline](baseline.md) bundle analysis. (Source maps aren't
+exposed, so that's not a finding.)
+
+- The theme stylesheet ships ~2.3 MB and is ~99% unused.
+  - **Baseline**: one monolithic `EverythingNight.css` / `EverythingDay.css` — ~2.3 MB uncompressed (311 KB brotli), render-blocking on every page; DevTools Coverage measures **~99% of it unused** on the homepage (2.28 MB of 2.31 MB).
+  - **Cause**:
+    - The whole theme ships as one file with no per-route or per-component splitting, so a page loads styling for every template on the site.
+  - **Solution**:
+    - Extract the critical CSS the page needs and load the rest non-blocking; split or purge the sheet so a page only ships the rules it uses.
+  - **Priority (WSJF)**: CoD 18 (UV 7 + TC 5 + R/O 6) ÷ Job 5 = **3.6** (Med).
+
+- Font Awesome 4.7 loads the whole icon library for a few icons.
+  - **Baseline**: `font-awesome.min.css` (plus its webfont); Coverage measures **98.9% unused** (30.5 KB of 31 KB CSS, and the font downloads in full).
+  - **Cause**:
+    - The entire Font Awesome 4.7 set is pulled in though the page uses only a handful of glyphs.
+  - **Solution**:
+    - Subset Font Awesome to the icons in use, or replace them with inline SVGs and drop the dependency.
+  - **Priority (WSJF)**: CoD 7 (UV 3 + TC 2 + R/O 2) ÷ Job 2 = **3.5** (Med — a cheap, self-contained win).
+
+- The main `hltv.js` bundle is ~3 MB and isn't code-split.
+  - **Baseline**: a single `hltv.js` — ~3.0 MB uncompressed (577 KB brotli), render-blocking and dominant in the LCP path (~7.5 s in PSI); Coverage measures **42% unused** on the homepage (1.26 MB of 3.0 MB), and `hltv-base-js.js` is 51% unused.
+  - **Cause**:
+    - Everything is concatenated into one main bundle (content-hashed but not split by route or component), so the homepage parses and runs code for the whole site.
+  - **Solution**:
+    - Split by route and lazy-load heavy or rarely-used components on interaction/visibility, so each page ships only the JS it needs.
+  - **Priority (WSJF)**: CoD 18 (UV 7 + TC 5 + R/O 6) ÷ Job 7 = **2.6** (Low — big win, but restructuring a 3 MB bundle is the largest job here).
 
 ## Mobile
 

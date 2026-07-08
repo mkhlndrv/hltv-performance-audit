@@ -119,6 +119,67 @@ Screenshots for these are in `evidence/02-baseline-findings/`:
 `psi-mobile-image-delivery.png`, `psi-mobile-oversized-images.png`,
 `psi-mobile-third-parties.png`.
 
+## Bundle analysis
+
+How the build outputs are shipped (Day 7 method). HLTV blocks automated tooling
+(Cloudflare), so this is from DevTools run by hand on 8 July 2026 — the Network
+panel and the Coverage tab (screenshots in `evidence/05-bundles/`); third-party
+costs are from the PSI mobile report.
+
+Coverage on a fresh load shows the page executes only **33% of the 23 MB** of JS
+and CSS it pulls (**15.5 MB unused**); across just the first-party bundles it's
+**36% of 5.7 MB used — 3.7 MB unused**.
+
+### JavaScript
+
+- **Bundling** — one large first-party bundle, `hltv.js` (**~3.0 MB uncompressed**,
+  577 KB brotli), plus a small `hltv-base-js.js` (~96 KB) and a few tiny hashed
+  chunks. Content-hashed for caching, but effectively a single main bundle — no
+  route- or component-level splitting.
+- **Unused JS** — Coverage: **42% of `hltv.js` unused** on the homepage (1.26 MB of
+  3.0 MB) and **51% of `hltv-base-js.js`** unused. `hltv.js` is also render-blocking
+  and dominates the LCP path (~7.5 s in PSI).
+- **Source maps** — none surfaced in the capture; the minified bundles ship without
+  public `.map` files, which is the correct production choice.
+
+### CSS
+
+- **Bundling** — one monolithic theme stylesheet, `EverythingNight.css` (or
+  `EverythingDay.css` in light mode) — **~2.3 MB uncompressed** (311 KB brotli),
+  loaded render-blocking — plus Font Awesome 4.7's `font-awesome.min.css`. No
+  per-route/component splitting: the whole theme ships on every page.
+- **Unused CSS** — Coverage: **~99% of the theme sheet unused** on the homepage
+  (2.28 MB of 2.31 MB) and **98.9% of Font Awesome** unused (the entire icon library
+  loads for a handful of glyphs).
+
+### Images
+
+- **Sizes/formats** — content photos go through the `img-cdn.hltv.org` proxy as
+  **WebP**, resized per request (modern format, serve-time sizing). But UI assets
+  like the news-list flags are shipped as individual **30×20 GIFs**
+  (`/img/static/flags/…`) — a dated format, one request each, no sprite or SVG.
+- **Responsive** — the content photos carry no `srcset`, so a phone gets the same
+  file as desktop (the existing "mobile downloads desktop-sized images" finding),
+  and the ranking photos arrive at 400×417 for a ~70×73 slot.
+- **Full-resolution** — the `img-cdn` proxy serves fixed preset sizes rather than
+  passing the raw source URL, so the full-res original isn't directly exposed
+  (unlike AP's open proxy).
+
+### Third-party resources
+
+- **Inventory** — consent via **Cookiebot** (`uc.js` + `consent-sdk-2.3.js`,
+  ~106 KB), **Google Analytics 4** (`gtag`, 181 KB), **Facebook Pixel**
+  (`fbevents.js`, 101 KB), a **Twitter/X tag** (`uwt.js`), liftdsp's `admtracker`
+  and a cadmus ad script, plus (PSI) Google Tag Manager, Outbrain, Yahoo and
+  DoubleClick.
+- **Loading** — mostly `async`; the Pixel, GA, Twitter tag and admtracker are all
+  injected by a single tag-loader after the first scripts, and the consent SDK
+  loads up front.
+- **Impact** (PSI mobile) — Google Tag Manager 490 KiB (186 ms), the consent script
+  316 KiB (284 ms), Facebook 164 KiB (135 ms) and cadmus 163 KiB (265 ms) are the
+  heaviest; cadmus and `admtracker` also force synchronous reflows (99 ms and
+  171 ms).
+
 ## Note on method
 
 Scores are from PageSpeed Insights (Lighthouse on Google's infrastructure — a
