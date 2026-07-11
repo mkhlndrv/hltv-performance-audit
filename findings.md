@@ -47,9 +47,11 @@ they're observations, not work.
 | 6 | Theme CSS ~2.3 MB, ~99% unused | 7 | 5 | 6 | 18 | 5 | **3.6** | Med |
 | 7 | Font Awesome library ~99% unused | 3 | 2 | 2 | 7 | 2 | **3.5** | Med |
 | 8 | Blank screen before render (FCP) | 7 | 5 | 6 | 18 | 6 | **3.0** | Med |
-| 9 | `hltv.js` ~3 MB, 42% unused, not split | 7 | 5 | 6 | 18 | 7 | **2.6** | Low |
-| 10 | Far slower on mobile than desktop | 9 | 6 | 5 | 20 | 8 | **2.5** | Low |
-| 11 | Freezes while loading (TBT) | 6 | 4 | 5 | 15 | 7 | **2.1** | Low |
+| 9 | Critical CSS not extracted; theme sheet blocks paint | 6 | 4 | 5 | 15 | 5 | **3.0** | Med |
+| 10 | `hltv.js` ~3 MB, 42% unused, not split | 7 | 5 | 6 | 18 | 7 | **2.6** | Low |
+| 11 | Far slower on mobile than desktop | 9 | 6 | 5 | 20 | 8 | **2.5** | Low |
+| 12 | Render-blocking JS delays interactivity | 5 | 4 | 5 | 14 | 6 | **2.3** | Low |
+| 13 | Freezes while loading (TBT) | 6 | 4 | 5 | 15 | 7 | **2.1** | Low |
 
 The one-line hero `fetchpriority` fix tops the list at 18, and contained asset
 swaps (the GIF, responsive images) beat the big rewrites. The mobile umbrella
@@ -162,6 +164,37 @@ exposed, so that's not a finding.)
   - **Solution**:
     - Split by route and lazy-load heavy or rarely-used components on interaction/visibility, so each page ships only the JS it needs.
   - **Priority (WSJF)**: CoD 18 (UV 7 + TC 5 + R/O 6) ÷ Job 7 = **2.6** (Low — big win, but restructuring a 3 MB bundle is the largest job here).
+
+## Frames and layers
+
+Day 8 pass — critical CSS, the flame chart and compositing; see the baseline's
+rendering/frames/layers section and `evidence/07-frames-layers/`. HLTV is healthy
+here, so this set is one corrective per issue found plus a "good" — the Layers set is
+genuinely a strength, not a corrective (forcing one would be dishonest).
+
+### Corrective
+
+- Critical CSS isn't extracted — the theme sheet blocks first paint.
+  - **Baseline**: the `<head>` has no critical-CSS block — just a leftover `#asdasda {}` debug rule, a Cookiebot style and Font Awesome — then the ~2.3 MB theme sheet (`EverythingNight.css`) loads render-blocking via a `<link>` and a theme-switch script; Coverage shows ~99% of it unused.
+  - **Cause**:
+    - No above-the-fold critical CSS and no defer: the whole theme sheet gates the first paint on every load.
+  - **Solution**:
+    - Inline the critical CSS and load the theme sheet non-blocking (preload + swap); drop the leftover debug `<style>`.
+  - **Priority (WSJF)**: CoD 15 (UV 6 + TC 4 + R/O 5) ÷ Job 5 = **3.0** (Med).
+
+- Render-blocking JS delays interactivity.
+  - **Baseline**: WebPageTest (clean, no extensions) shows **TBT 0.71 s** and "took a long time to become interactive"; the DevTools flame chart is inflated by browser extensions, but HLTV's own share is `hltv.js` evaluate-script plus GTM (241 ms) and cadmus (191 ms) on load.
+  - **Cause**:
+    - `hltv.js` is render-blocking and evaluates on the main thread during load, and the tag/ad scripts add to it, so the page is slow to become interactive even though first paint eventually lands.
+  - **Solution**:
+    - Defer and code-split `hltv.js`, and load GTM/cadmus after first paint (same lever as the bundle and third-party findings above).
+  - **Priority (WSJF)**: CoD 14 (UV 5 + TC 4 + R/O 5) ÷ Job 6 = **2.3** (Low).
+
+### Good
+
+- Compositing is lean.
+  - **Baseline**: the Layers panel shows **9 layers using 103 MB** of GPU memory, with **no slow-scroll regions** — versus AP's 20 layers / 814 MB. The rootScroller uses accelerated scrolling; the rest are ordinary promotions (nav, columns, sidebar strips).
+  - Nothing is force-promoted with `will-change`/`translateZ`, so compositing isn't a jank source — a genuine strength, and the reason this question set has no corrective.
 
 ## Mobile
 
