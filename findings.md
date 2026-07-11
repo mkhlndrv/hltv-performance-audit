@@ -166,13 +166,16 @@ exposed, so that's not a finding.)
 ## Mobile
 
 Mobile is Google's primary ranking signal, and Slow 4G + 4× CPU is the condition
-the audit weights first. HLTV's field data passes on mobile, so these are about
-the throttled low-end — but that's the tail the lab exposes and the profile mobile
-ranking is scored on.
+the audit weights first. Both scores are recorded (PSI Performance 39 mobile / 69
+desktop); the Day 6 gap metric — mobile TBT ÷ desktop TBT — is 970 ÷ 410 = **2.4×**.
+HLTV's field data passes on mobile, so these are the throttled low-end tail — but
+that's what the lab exposes and the profile mobile ranking is scored on. Each
+finding is tagged **mobile-amplified** (worse under throttling) or
+**mobile-exclusive** (only on mobile).
 
 ### Corrective
 
-- The same page is far slower on mobile than on desktop.
+- The same page is far slower on mobile than on desktop. *(mobile-amplified)*
   - **Baseline**: throttled-mobile lab (Slow 4G + 4× CPU) vs desktop lab — Performance 39 vs 69, LCP 10.7 s vs 1.8 s (~6×), FCP 3.2 s vs 0.8 s, Speed Index 10.2 s vs 2.4 s, TBT 970 ms vs 410 ms.
   - **Cause**:
     - Mobile and desktop download almost the same bytes (5.2 MB vs 5.3 MB), so the gap isn't payload — it's the render-blocking chain (est. 10,180 ms; `hltv.js` 563 KiB / ~7,530 ms, `EverythingDay.css` 2.3 MB) and the JS main-thread work meeting a 4× slower CPU and a slow radio.
@@ -180,7 +183,7 @@ ranking is scored on.
     - The rendering fixes elsewhere in this report (inline critical CSS, split and defer the CSS/JS, `fetchpriority` on the hero) barely move the desktop score but are what rescue mobile — budget and test against Slow 4G + 4× CPU, not a desktop link.
   - **Priority (WSJF)**: CoD 20 (UV 9 + TC 6 + R/O 5) ÷ Job 8 = **2.5** (Low — an umbrella finding; its job size is the whole rendering program, so WSJF ranks the ROI low even though the value is the highest of the set).
 
-- Mobile downloads desktop-sized images.
+- Mobile downloads desktop-sized images. *(mobile-amplified)*
   - **Baseline**: images are 2.2 MB of the 5.2 MB mobile load; Speed Index / LCP.
   - **Cause**:
     - There's no responsive `srcset`, so a phone fetches the same full-size assets desktop does — the ranking photos at 400×417 (shown ~70×73) and the 624 KiB animated GIF banner — and on Slow 4G those image bytes dominate the load. (The oversized-image root is the networking finding above; the mobile-specific point is that nothing is downscaled for the small screen or the slow link.)
