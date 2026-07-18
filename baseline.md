@@ -238,6 +238,57 @@ captured by hand on 11 July 2026 (Cloudflare blocks automation). Screenshots in
 - Nothing is force-promoted with `will-change`/`translateZ`, and the site's own
   animations aren't a jank source. Compositing is a strength here, not a problem.
 
+## Rendering strategy
+
+Day 12 pass — the three-check fingerprint (view source, reload with JavaScript
+disabled, read the document response in the Network panel), per page type.
+Cloudflare serves automated fetches a challenge (a plain `curl` of the homepage
+returns `403 cf-mitigated: challenge`), so the document headers here are read by
+hand from the DevTools Network panel. Screenshots in
+`evidence/08-rendering-strategies/`.
+
+### What's in use, per page
+
+- **Every page — server-side rendered, per request.** The document arrives with the
+  content already in the HTML (news lines, match scores and rankings are in
+  view-source, not injected by JS), and with JavaScript disabled the page still
+  displays. HLTV is a classic server-render plus progressive-enhancement stack —
+  `hltv.js` layered on complete HTML, not a hydration framework.
+- **The document is not edge-cached.** Both the homepage and a published news
+  article come back `Cf-Cache-Status: DYNAMIC` — Cloudflare passes every document
+  request through to origin instead of serving it from the edge (contrast AP's
+  articles, which are `HIT`). HLTV's own origin proxy does cache
+  (`X-Proxy-Cache: STALE`, and `Server-Timing: cfOrigin;dur=0` — origin answered
+  instantly from its cache), so it isn't re-rendering from scratch each time; what
+  users pay is the full round-trip to origin for the HTML instead of a nearby edge
+  hit. First-party static assets cache for only ~8 h. One nice touch: Cloudflare's
+  Speculation Rules are on (`Speculation-Rules: /cdn-cgi/speculation`), so likely
+  next pages get prefetched.
+- **Same strategy on every page type.** The live homepage (match ticker, updating
+  scores), a published news article, a finished match page and the forum all get the
+  same DYNAMIC document and the same ~3 MB `hltv.js`.
+
+### How it affects users, and the tradeoffs
+
+SSR is why HLTV's field numbers are good: content in the first response gives FCP
+1.54 s, LCP 1.76 s and TTFB 0.46 s at the 75th percentile — all "good." The metric
+signature is SSR-with-a-heavy-client-layer, the same family as AP but far lighter:
+fast paint, then a lag to interactivity (WebPageTest TBT 0.71 s, "took a long time
+to become interactive") from the render-blocking `hltv.js`. There's no hydration tax
+and no CSR blank-screen risk — the tradeoff runs the other way: because the document
+isn't edge-cached, every visitor round-trips to origin for the HTML (the edge doesn't
+answer), and every page carries the full interactive bundle whether it needs it or not.
+
+### Is it the right choice?
+
+The SSR base is the right call for a live-scores/news site and shouldn't change —
+it's what earns the passing field score. But the strategy is applied uniformly where
+the page types genuinely differ: a finished match or a published article is the same
+for everyone and barely changes, so routing it back to origin per request with no edge
+cache is waste, and shipping a read-focused page the whole live-page JS budget is more
+than it needs. The honest recommendation is per-route caching and islands, not a migration.
+See the rendering-strategy findings.
+
 ## Note on method
 
 Scores are from PageSpeed Insights (Lighthouse on Google's infrastructure — a

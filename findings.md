@@ -46,18 +46,20 @@ they're observations, not work.
 | 5 | Third-party tag/consent/ad stack | 6 | 4 | 8 | 18 | 5 | **3.6** | Med |
 | 6 | Theme CSS ~2.3 MB, ~99% unused | 7 | 5 | 6 | 18 | 5 | **3.6** | Med |
 | 7 | Font Awesome library ~99% unused | 3 | 2 | 2 | 7 | 2 | **3.5** | Med |
-| 8 | Blank screen before render (FCP) | 7 | 5 | 6 | 18 | 6 | **3.0** | Med |
-| 9 | Critical CSS not extracted; theme sheet blocks paint | 6 | 4 | 5 | 15 | 5 | **3.0** | Med |
-| 10 | `hltv.js` ~3 MB, 42% unused, not split | 7 | 5 | 6 | 18 | 7 | **2.6** | Low |
-| 11 | Far slower on mobile than desktop | 9 | 6 | 5 | 20 | 8 | **2.5** | Low |
-| 12 | Render-blocking JS delays interactivity | 5 | 4 | 5 | 14 | 6 | **2.3** | Low |
-| 13 | Freezes while loading (TBT) | 6 | 4 | 5 | 15 | 7 | **2.1** | Low |
+| 8 | Same-for-everyone pages not edge-cached (Cloudflare-DYNAMIC) | 5 | 4 | 5 | 14 | 4 | **3.5** | Med |
+| 9 | Blank screen before render (FCP) | 7 | 5 | 6 | 18 | 6 | **3.0** | Med |
+| 10 | Critical CSS not extracted; theme sheet blocks paint | 6 | 4 | 5 | 15 | 5 | **3.0** | Med |
+| 11 | `hltv.js` ~3 MB, 42% unused, not split | 7 | 5 | 6 | 18 | 7 | **2.6** | Low |
+| 12 | Far slower on mobile than desktop | 9 | 6 | 5 | 20 | 8 | **2.5** | Low |
+| 13 | Render-blocking JS delays interactivity | 5 | 4 | 5 | 14 | 6 | **2.3** | Low |
+| 14 | Freezes while loading (TBT) | 6 | 4 | 5 | 15 | 7 | **2.1** | Low |
+| 15 | One strategy for all page types | 6 | 4 | 6 | 16 | 8 | **2.0** | Low |
 
 The one-line hero `fetchpriority` fix tops the list at 18, and contained asset
 swaps (the GIF, responsive images) beat the big rewrites. The mobile umbrella
-(row 7) scores *low* despite mobile being the primary profile — not because it
-doesn't matter but because its job size is the whole rendering program; read it as
-"high value, big project." And because HLTV already passes for real users, nothing
+("Far slower on mobile than desktop", 2.5) scores *low* despite mobile being the
+primary profile — not because it doesn't matter but because its job size is the
+whole rendering program; read it as "high value, big project." And because HLTV already passes for real users, nothing
 here is urgent — WSJF is sorting nice-to-haves, which is the right posture for a
 site that's healthy in the field.
 
@@ -100,6 +102,38 @@ site that's healthy in the field.
   - **Solution**:
     - Load tag-manager and analytics after first paint, load the consent script without blocking render, and drop or defer the ad/tracking calls that aren't needed at load.
   - **Priority (WSJF)**: CoD 18 (UV 6 + TC 4 + R/O 8) ÷ Job 5 = **3.6** (Med — the R/O score is high: this is the main third-party/privacy risk cut).
+
+## Rendering strategy
+
+Day 12 pass — fingerprinting where each page renders and whether that's the right
+call for the page type. See the [baseline](baseline.md) rendering-strategy section
+and `evidence/08-rendering-strategies/`. The SSR base is sound (it's what passes the
+field score), so this set is one "good" plus two corrective findings about applying
+it uniformly.
+
+### Good
+
+- Server-side rendering is the right base, and it's why real users pass.
+  - **Baseline**: content is in the first response (field FCP 1.54 s, LCP 1.76 s, TTFB 0.46 s — all "good"), with JS disabled the page still shows, and there's no hydration framework to pay for.
+  - For a live-scores and news site, SSR is the correct choice — a migration is not a recommendation. The corrective findings are about *how uniformly* it's applied, not the base strategy.
+
+### Corrective
+
+- Same-for-everyone pages aren't edge-cached — every request goes to origin.
+  - **Baseline**: both the homepage and a published news article return `Cf-Cache-Status: DYNAMIC` — Cloudflare doesn't serve the HTML from its edge (contrast AP's articles at `HIT`). HLTV's origin proxy does cache the response (`X-Proxy-Cache: STALE`, `Server-Timing: cfOrigin;dur=0`), so it isn't a from-scratch render, but a reader still round-trips to origin for a page that's identical for everyone and barely changes. First-party static assets cache only ~8 h.
+  - **Cause**:
+    - The document isn't promoted to the CDN edge for any route — even static-eligible ones. The origin proxy softens the render cost, but the response never gets a `Cache-Control: s-maxage` that would let Cloudflare hold it at the edge the way AP's articles are held.
+  - **Solution**:
+    - Let Cloudflare edge-cache (or statically generate) the same-for-everyone routes — published articles, finished matches — with stale-while-revalidate, and keep the live homepage and forum DYNAMIC. The origin already does SWR; the missing step is an edge cache rule / `s-maxage` so a reader is served from the nearest POP. "What actually breaks if this is five minutes old?" — for a finished match, nothing.
+  - **Priority (WSJF)**: CoD 14 (UV 5 + TC 4 + R/O 5) ÷ Job 4 = **3.5** (Med).
+
+- One rendering strategy is applied to page types with different needs.
+  - **Baseline**: the live homepage, a read-only news article, a finished match and the interactive forum all get the same per-request SSR and the same ~3 MB `hltv.js`. The lesson's "smell of error" is exactly this uniformity — one page type's needs imposed on all others.
+  - **Cause**:
+    - A read-focused article needs little JS and could be static; a live page needs per-request data and interactivity. Shipping both the same render policy and the same full bundle over-serves the read pages.
+  - **Solution**:
+    - Split by route: static/edge-cached with islands for the interactive bits (search, theme switch) on content pages; per-request SSR on live pages. This is the same code-split lever as the `hltv.js` finding, but the strategy point is matching *each page type* to its own answer, which modern metaframeworks make configuration rather than a rewrite.
+  - **Priority (WSJF)**: CoD 16 (UV 6 + TC 4 + R/O 6) ÷ Job 8 = **2.0** (Low — the biggest job of the set; read it as "high value, big project").
 
 ## Networking
 
