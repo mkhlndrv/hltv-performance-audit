@@ -279,10 +279,11 @@ and no CSR blank-screen risk — the tradeoff runs the other way: because the do
 isn't edge-cached, every visitor round-trips to origin for the HTML (the edge doesn't
 answer), and every page carries the full interactive bundle whether it needs it or not.
 
-### Is it the right choice?
+### Is it a good choice for those pages — and the best one?
 
-The SSR base is the right call for a live-scores/news site and shouldn't change —
-it's what earns the passing field score. But the strategy is applied uniformly where
+A good choice, but not the best as applied. The SSR base is the right call for a
+live-scores/news site and shouldn't change — it's what earns the passing field
+score. It falls short of best because the strategy is applied uniformly where
 the page types genuinely differ: a finished match or a published article is the same
 for everyone and barely changes, so routing it back to origin per request with no edge
 cache is waste, and shipping a read-focused page the whole live-page JS budget is more
