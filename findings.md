@@ -37,23 +37,28 @@ or CSS rewrite.
 WSJF = Cost of Delay ÷ Job Size. Higher = do sooner. Good findings aren't scored —
 they're observations, not work.
 
-| # | Finding | UV | TC | R/O | CoD | Job | WSJF | Tier |
-|---|---------|:--:|:--:|:---:|:---:|:---:|:----:|:----:|
-| 1 | Hero image loads late (LCP) | 8 | 6 | 4 | 18 | 1 | **18.0** | High |
-| 2 | Top banner is a 624 KiB GIF | 5 | 3 | 2 | 10 | 2 | **5.0** | High |
-| 3 | Mobile gets desktop-sized images | 6 | 4 | 3 | 13 | 3 | **4.3** | Med |
-| 4 | Ranking photos oversized for their box | 5 | 3 | 3 | 11 | 3 | **3.7** | Med |
-| 5 | Third-party tag/consent/ad stack | 6 | 4 | 8 | 18 | 5 | **3.6** | Med |
-| 6 | Theme CSS ~2.3 MB, ~99% unused | 7 | 5 | 6 | 18 | 5 | **3.6** | Med |
-| 7 | Font Awesome library ~99% unused | 3 | 2 | 2 | 7 | 2 | **3.5** | Med |
-| 8 | Same-for-everyone pages not edge-cached (Cloudflare-DYNAMIC) | 5 | 4 | 5 | 14 | 4 | **3.5** | Med |
-| 9 | Blank screen before render (FCP) | 7 | 5 | 6 | 18 | 6 | **3.0** | Med |
-| 10 | Critical CSS not extracted; theme sheet blocks paint | 6 | 4 | 5 | 15 | 5 | **3.0** | Med |
-| 11 | `hltv.js` ~3 MB, 42% unused, not split | 7 | 5 | 6 | 18 | 7 | **2.6** | Low |
-| 12 | Far slower on mobile than desktop | 9 | 6 | 5 | 20 | 8 | **2.5** | Low |
-| 13 | Render-blocking JS delays interactivity | 5 | 4 | 5 | 14 | 6 | **2.3** | Low |
-| 14 | Freezes while loading (TBT) | 6 | 4 | 5 | 15 | 7 | **2.1** | Low |
-| 15 | One strategy for all page types | 6 | 4 | 6 | 16 | 8 | **2.0** | Low |
+| ID | Finding | UV | TC | R/O | CoD | Job | WSJF | Tier |
+|----|---------|:--:|:--:|:---:|:---:|:---:|:----:|:----:|
+| F-01 | Hero image loads late (LCP) | 8 | 6 | 4 | 18 | 1 | **18.0** | High |
+| F-02 | Top banner is a 624 KiB GIF | 5 | 3 | 2 | 10 | 2 | **5.0** | High |
+| F-03 | Mobile gets desktop-sized images | 6 | 4 | 3 | 13 | 3 | **4.3** | Med |
+| F-04 | Ranking photos oversized for their box | 5 | 3 | 3 | 11 | 3 | **3.7** | Med |
+| F-05 | Third-party tag/consent/ad stack | 6 | 4 | 8 | 18 | 5 | **3.6** | Med |
+| F-06 | Theme CSS ~2.3 MB, ~99% unused | 7 | 5 | 6 | 18 | 5 | **3.6** | Med |
+| F-07 | Font Awesome library ~99% unused | 3 | 2 | 2 | 7 | 2 | **3.5** | Med |
+| F-08 | Same-for-everyone pages not edge-cached (Cloudflare-DYNAMIC) | 5 | 4 | 5 | 14 | 4 | **3.5** | Med |
+| F-09 | Blank screen before render (FCP) | 7 | 5 | 6 | 18 | 6 | **3.0** | Med |
+| F-10 | Critical CSS not extracted; theme sheet blocks paint | 6 | 4 | 5 | 15 | 5 | **3.0** | Med |
+| F-11 | `hltv.js` ~3 MB, 42% unused, not split | 7 | 5 | 6 | 18 | 7 | **2.6** | Low |
+| F-12 | Far slower on mobile than desktop | 9 | 6 | 5 | 20 | 8 | **2.5** | Low |
+| F-13 | Render-blocking JS delays interactivity | 5 | 4 | 5 | 14 | 6 | **2.3** | Low |
+| F-14 | Freezes while loading (TBT) | 6 | 4 | 5 | 15 | 7 | **2.1** | Low |
+| F-15 | One strategy for all page types | 6 | 4 | 6 | 16 | 8 | **2.0** | Low |
+
+IDs are stable references shared with the stakeholder report
+([stakeholder-report.md](stakeholder-report.md)) and the implementer notes
+([implementer-notes.md](implementer-notes.md)) — the same ID carries the same
+numbers in every document; ranks may move if a score is re-argued.
 
 The one-line hero `fetchpriority` fix tops the list at 18, and contained asset
 swaps (the GIF, responsive images) beat the big rewrites. The mobile umbrella
